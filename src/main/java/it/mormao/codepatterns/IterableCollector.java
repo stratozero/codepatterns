@@ -68,7 +68,10 @@ public class IterableCollector<T> {
 	public void consume(final int splitEvery, BiPredicate<T, T> comparator, BiConsumer<T, T> consumer){
 		if(splitEvery > 0) {
 			final AtomicInteger count = new AtomicInteger(0);
-			consume((t1, t2) -> count.incrementAndGet() >= splitEvery || comparator.test(t1,t2), consumer);
+			consume((t1, t2) -> count.incrementAndGet() >= splitEvery || comparator.test(t1,t2), (t1, t2) -> {
+				count.set(0);
+				consumer.accept(t1, t2);
+			});
 		} else
 			consume(comparator, consumer);
 	}
@@ -82,7 +85,10 @@ public class IterableCollector<T> {
 	public void consumeEvery(final int splitEvery, BiConsumer<T, T> consumer){
 		if(splitEvery > 0) {
 			AtomicInteger count = new AtomicInteger(0);
-			this.consume((t1, t2) -> count.incrementAndGet() >= splitEvery, consumer);
+			this.consume((t1, t2) -> count.incrementAndGet() >= splitEvery, (t1,t2) -> {
+				count.set(0);
+				consumer.accept(t1, t2);
+			});
 		} else
 			consumeEvery(1, consumer);
 	}
@@ -95,23 +101,30 @@ public class IterableCollector<T> {
 	 */
 	public void sliceConsume(BiPredicate<T, T> splitCondition, Consumer<List<T>> consumer){
 		Iterator<T> init = it.iterator();
-		List<T> accumulator = new ArrayList<>();
 		if(init.hasNext()) {
+			List<T> accumulator = new ArrayList<>();
 			T start = init.next();
 			T next;
-			while(init.hasNext()){
-				next = init.next();
+			if(!init.hasNext()) {
 				accumulator.add(start);
+				consumer.accept(accumulator);
+			} else {
+				do {
+					accumulator.add(start);
+					next = init.next();
 
-				if(splitCondition.test(start, next)) {
-					consumer.accept(accumulator);
-					accumulator = new ArrayList<>();
-				}
+					if (splitCondition.test(start, next)) {
+						consumer.accept(accumulator);
+						accumulator = new ArrayList<>();
+						if(!init.hasNext())
+							accumulator.add(next);
+					}
 
-				if(init.hasNext())
-					start = next;
-				else if(!accumulator.isEmpty())
-					consumer.accept(accumulator);
+					if (init.hasNext())
+						start = next;
+					else if (!accumulator.isEmpty())
+						consumer.accept(accumulator);
+				} while (init.hasNext());
 			}
 		}
 	}
@@ -126,7 +139,10 @@ public class IterableCollector<T> {
 	public void sliceConsume(final int splitEvery, BiPredicate<T, T> splitCondition, Consumer<List<T>> consumer) {
 		if(splitEvery > 0) {
 			final AtomicInteger count = new AtomicInteger(0);
-			sliceConsume((t1, t2) -> count.incrementAndGet() >= splitEvery || splitCondition.test(t1,t2), consumer);
+			sliceConsume((t1, t2) -> count.incrementAndGet() >= splitEvery || splitCondition.test(t1,t2), l -> {
+				count.set(0);
+				consumer.accept(l);
+			});
 		} else
 			sliceConsume(splitCondition, consumer);
 	}
@@ -140,7 +156,10 @@ public class IterableCollector<T> {
 	public void sliceConsumeEvery(final int splitEvery, Consumer<List<T>> consumer){
 		if(splitEvery > 0) {
 			final AtomicInteger count = new AtomicInteger(0);
-			sliceConsume((t1, t2) -> count.incrementAndGet() >= splitEvery, consumer);
+			sliceConsume((t1, t2) -> count.incrementAndGet() >= splitEvery, l -> {
+				count.set(0);
+				consumer.accept(l);
+			});
 		} else
 			sliceConsumeEvery(1, consumer);
 	}
