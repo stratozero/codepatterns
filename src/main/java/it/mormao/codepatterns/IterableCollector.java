@@ -1,13 +1,11 @@
 package it.mormao.codepatterns;
 
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Iterator;
-import java.util.List;
+import java.util.*;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.BiConsumer;
 import java.util.function.BiPredicate;
 import java.util.function.Consumer;
+import java.util.function.Function;
 
 /**
  * A utility class, whose purpose is to eliminate boilerplate code and repetitions needed to accumulate elements of a list and operate on portions of them
@@ -145,6 +143,32 @@ public class IterableCollector<T> {
 			});
 		} else
 			sliceConsume(splitCondition, consumer);
+	}
+
+	/**
+	 * Accumulate a certain number of elements, until mapper.apply(t1) != mapper.apply(t2)
+	 * @param mapper a function which maps an element of type T to any element of any type
+	 * @param consumer the consumer that accept(accumulatedList)
+	 */
+	public void sliceConsume(Function<T,?> mapper, Consumer<List<T>> consumer){
+		sliceConsume((t1, t2) -> !Objects.equals(mapper.apply(t1), mapper.apply(t2)), consumer);
+	}
+
+	/**
+	 * Accumulate a certain number of elements, until mapper.apply(t1) != mapper.apply(t2) or the limit specified by "splitEvery"
+	 * @param splitEvery maximum number of elements every which the "accept" operation has to be executed, regardless of the BiPredicate.test result
+	 * @param mapper the boolean predicate which states if the consumer has to be executed or not
+	 * @param consumer the consumer that accept(accumulatedList)
+	 */
+	public void sliceConsume(final int splitEvery, Function<T,?> mapper, Consumer<List<T>> consumer){
+		if(splitEvery > 0) {
+			final AtomicInteger count = new AtomicInteger(0);
+			sliceConsume((t1, t2) -> count.incrementAndGet() >= splitEvery || !Objects.equals(mapper.apply(t1), mapper.apply(t2)), l -> {
+				count.set(0);
+				consumer.accept(l);
+			});
+		} else
+			sliceConsume(mapper, consumer);
 	}
 
 	/**
